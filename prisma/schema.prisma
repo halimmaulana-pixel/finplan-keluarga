@@ -1,0 +1,233 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Family {
+  id         String   @id @default(cuid())
+  name       String
+  pinHash    String
+  startMonth DateTime
+  createdAt  DateTime @default(now())
+
+  incomes      Income[]
+  bills        Bill[]
+  debts        Debt[]
+  savingsGoals SavingsGoal[]
+  assets       Asset[]
+  expenses     DailyExpense[]
+  accounts     Account[]
+  walletEntries WalletEntry[]
+  insights     Insight[]
+  reports      MonthlyReport[]
+  patterns     SpendingPattern[]
+}
+
+model Income {
+  id        String      @id @default(cuid())
+  familyId  String
+  name      String
+  amount    Decimal     @db.Decimal(15, 2)
+  frequency String      // MONTHLY | IRREGULAR
+  isActive  Boolean     @default(true)
+  family    Family      @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  entries   IncomeEntry[]
+}
+
+model IncomeEntry {
+  id        String   @id @default(cuid())
+  incomeId  String
+  amount    Decimal  @db.Decimal(15, 2)
+  date      DateTime
+  note      String?
+  allocated Boolean  @default(false)
+  income    Income   @relation(fields: [incomeId], references: [id], onDelete: Cascade)
+}
+
+model Bill {
+  id       String      @id @default(cuid())
+  familyId String
+  name     String
+  amount   Decimal     @db.Decimal(15, 2)
+  dueDay   Int
+  category String      // ELECTRICITY | INTERNET | PHONE | STAFF | OTHER
+  isActive Boolean     @default(true)
+  family   Family      @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  payments BillPayment[]
+}
+
+model BillPayment {
+  id     String    @id @default(cuid())
+  billId String
+  month  String
+  paidAt DateTime?
+  amount Decimal   @db.Decimal(15, 2)
+  bill   Bill      @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@unique([billId, month])
+}
+
+model Debt {
+  id              String      @id @default(cuid())
+  familyId        String
+  name            String
+  type            String      // PINJOL | KPR | KKB | PERSONAL | OTHER
+  totalAmount     Decimal     @db.Decimal(15, 2)
+  remainingAmount Decimal     @db.Decimal(15, 2)
+  monthlyPayment  Decimal     @db.Decimal(15, 2)
+  dueDay          Int
+  remainingMonths Int
+  startDate       DateTime
+  family          Family      @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  payments        DebtPayment[]
+}
+
+model DebtPayment {
+  id      String    @id @default(cuid())
+  debtId  String
+  month   String
+  paidAt  DateTime?
+  amount  Decimal   @db.Decimal(15, 2)
+  isExtra Boolean   @default(false)
+  debt    Debt      @relation(fields: [debtId], references: [id], onDelete: Cascade)
+
+  @@unique([debtId, month])
+}
+
+model SavingsGoal {
+  id             String    @id @default(cuid())
+  familyId       String
+  name           String
+  targetAmount   Decimal   @db.Decimal(15, 2)
+  currentAmount  Decimal   @db.Decimal(15, 2) @default(0)
+  monthlyContrib Decimal   @db.Decimal(15, 2) @default(0)
+  targetDate     DateTime?
+  priority       Int       @default(1)
+  emoji          String?
+  family         Family    @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  contributions  GoalContribution[]
+}
+
+model GoalContribution {
+  id     String      @id @default(cuid())
+  goalId String
+  amount Decimal     @db.Decimal(15, 2)
+  date   DateTime
+  note   String?
+  goal   SavingsGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+}
+
+model Asset {
+  id           String        @id @default(cuid())
+  familyId     String
+  name         String
+  type         String        // PROPERTY | VEHICLE | GOLD | SAVINGS | INVESTMENT | OTHER
+  value        Decimal       @db.Decimal(15, 2)
+  linkedDebtId String?
+  family       Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  snapshots    AssetSnapshot[]
+}
+
+model AssetSnapshot {
+  id      String  @id @default(cuid())
+  assetId String
+  month   String
+  value   Decimal @db.Decimal(15, 2)
+  asset   Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, month])
+}
+
+model DailyExpense {
+  id               String   @id @default(cuid())
+  familyId         String
+  date             DateTime
+  amount           Decimal  @db.Decimal(15, 2)
+  category         String   // FOOD | TRANSPORT_CAR | TRANSPORT_MOTOR | GROCERY | HEALTH | EDUCATION | ENTERTAINMENT | SOCIAL | OTHER
+  subcategory      String?
+  note             String?
+  isConsumptive    Boolean?
+  consumptiveScore Decimal? @db.Decimal(4, 3)
+  family           Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id       String  @id @default(cuid())
+  familyId String
+  name     String
+  type     String  // BANK | EWALLET
+  role     String  // TRANSIT | BILLS | SAVINGS | TRANSPORT | GROCERY | SOCIAL
+  balance  Decimal @db.Decimal(15, 2) @default(0)
+  color    String?
+  family   Family  @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  allocations WalletAllocation[]
+}
+
+model WalletEntry {
+  id          String   @id @default(cuid())
+  familyId    String
+  amount      Decimal  @db.Decimal(15, 2)
+  source      String
+  date        DateTime
+  isAllocated Boolean  @default(false)
+  family      Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  allocations WalletAllocation[]
+}
+
+model WalletAllocation {
+  id            String      @id @default(cuid())
+  walletEntryId String
+  accountId     String
+  amount        Decimal     @db.Decimal(15, 2)
+  purpose       String
+  walletEntry   WalletEntry @relation(fields: [walletEntryId], references: [id], onDelete: Cascade)
+  account       Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+model Insight {
+  id        String   @id @default(cuid())
+  familyId  String
+  type      String   // ANOMALY | PATTERN | PREDICTION | RECOMMENDATION | WARNING
+  category  String?
+  title     String
+  body      String
+  severity  String   // INFO | WARNING | CRITICAL
+  month     String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  family    Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+}
+
+model MonthlyReport {
+  id              String   @id @default(cuid())
+  familyId        String
+  month           String
+  totalIncome     Decimal  @db.Decimal(15, 2)
+  totalExpense    Decimal  @db.Decimal(15, 2)
+  totalSaved      Decimal  @db.Decimal(15, 2)
+  netWorth        Decimal  @db.Decimal(15, 2)
+  healthScore     Int
+  consumptiveRate Decimal  @db.Decimal(5, 4)
+  insights        Json
+  generatedAt     DateTime @default(now())
+  family          Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, month])
+}
+
+model SpendingPattern {
+  id          String   @id @default(cuid())
+  familyId    String
+  month       String
+  clusterData Json
+  dnaProfile  Json
+  triggers    Json
+  updatedAt   DateTime @updatedAt
+  family      Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, month])
+}
