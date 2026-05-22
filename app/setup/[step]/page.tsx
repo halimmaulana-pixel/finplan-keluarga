@@ -49,7 +49,11 @@ function Step1({ onNext }: { onNext: () => void }) {
     const res = await fetch("/api/family", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, pin, startMonth: new Date().toISOString() }),
+      body: JSON.stringify({
+          name,
+          pin,
+          startMonth: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`,
+        }),
     })
     if (!res.ok) {
       const err = await res.json() as { error: string }
